@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { verifyTeacherPassword, createTeacher } from "@/lib/db";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
