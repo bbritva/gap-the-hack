@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Session } from '@/lib/types';
 import { signIn, signOut, useSession } from 'next-auth/react';
 
+export const dynamic = 'force-dynamic';
+
 export default function TeacherDashboard() {
   const router = useRouter();
   const { data: session, status } = useSession();
