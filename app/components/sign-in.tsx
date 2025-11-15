@@ -1,13 +1,8 @@
-import { signIn } from "@/auth";
+import { signInWithGoogle } from "@/app/actions/auth-actions";
 
 export function SignIn() {
   return (
-    <form
-      action={async () => {
-        "use server";
-        await signIn("google");
-      }}
-    >
+    <form action={signInWithGoogle}>
       <button
         type="submit"
         className="flex h-12 w-full items-center justify-center gap-3 rounded-full bg-white px-6 text-sm font-medium text-gray-900 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 md:w-auto"

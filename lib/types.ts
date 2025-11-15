@@ -4,6 +4,8 @@ export interface Teacher {
   id: number;
   email: string;
   name: string;
+  username?: string;
+  password_hash?: string;
   created_at: Date;
 }
 

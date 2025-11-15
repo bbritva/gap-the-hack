@@ -1,5 +1,6 @@
 import { sql } from '@vercel/postgres';
 import { Session, Question, Student, Response, Teacher } from './types';
+import bcrypt from 'bcryptjs';
 
 // Database utility functions using Vercel Postgres
 
@@ -12,6 +13,8 @@ export async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
+        username VARCHAR(255) UNIQUE,
+        password_hash VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
@@ -78,6 +81,7 @@ export async function initializeDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_students_session ON students(session_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_responses_student ON responses(student_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_responses_question ON responses(question_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_teachers_username ON teachers(username)`;
 
     console.log('Database initialized successfully');
     return true;
@@ -110,6 +114,68 @@ export async function getTeacherById(id: number): Promise<Teacher | null> {
     SELECT * FROM teachers WHERE id = ${id}
   `;
   return result.rows[0] || null;
+}
+
+export async function getTeacherByUsername(username: string): Promise<Teacher | null> {
+  const result = await sql<Teacher>`
+    SELECT * FROM teachers WHERE username = ${username}
+  `;
+  return result.rows[0] || null;
+}
+
+export async function createTeacherWithPassword(
+  username: string,
+  password: string,
+  email: string,
+  name: string
+): Promise<Teacher> {
+  const passwordHash = await bcrypt.hash(password, 10);
+  const result = await sql<Teacher>`
+    INSERT INTO teachers (username, password_hash, email, name)
+    VALUES (${username}, ${passwordHash}, ${email}, ${name})
+    ON CONFLICT (username) DO UPDATE 
+    SET password_hash = ${passwordHash}, email = ${email}, name = ${name}
+    RETURNING *
+  `;
+  return result.rows[0];
+}
+
+export async function verifyTeacherPassword(
+  username: string,
+  password: string
+): Promise<Teacher | null> {
+  const teacher = await getTeacherByUsername(username);
+  if (!teacher || !teacher.password_hash) {
+    return null;
+  }
+  
+  const isValid = await bcrypt.compare(password, teacher.password_hash);
+  if (!isValid) {
+    return null;
+  }
+  
+  return teacher;
+}
+
+export async function seedTeachers(): Promise<void> {
+  const teachers = [
+    { username: 'teacher1', password: '123', email: 'teacher1@quizclass.com', name: 'Teacher One' },
+    { username: 'teacher2', password: '123', email: 'teacher2@quizclass.com', name: 'Teacher Two' },
+    { username: 'teacher3', password: '123', email: 'teacher3@quizclass.com', name: 'Teacher Three' },
+    { username: 'teacher4', password: '123', email: 'teacher4@quizclass.com', name: 'Teacher Four' },
+    { username: 'teacher5', password: '123', email: 'teacher5@quizclass.com', name: 'Teacher Five' },
+  ];
+
+  for (const teacher of teachers) {
+    await createTeacherWithPassword(
+      teacher.username,
+      teacher.password,
+      teacher.email,
+      teacher.name
+    );
+  }
+  
+  console.log('Successfully seeded 5 teachers');
 }
 
 // Session operations

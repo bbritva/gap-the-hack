@@ -57,7 +57,7 @@ export default function Home() {
 
           {/* Teacher Card */}
           <Link
-            href="/teacher/dashboard"
+            href="/teacher/login"
             className="group relative overflow-hidden rounded-3xl bg-white p-8 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl dark:bg-gray-800"
           >
             <div className="absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-purple-100 opacity-50 transition-transform duration-300 group-hover:scale-150 dark:bg-purple-900"></div>
