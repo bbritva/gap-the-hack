@@ -1,188 +1,193 @@
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { SignOut } from '@/app/components/sign-out';
+'use client';
 
-export default async function TeacherDashboard() {
-  const session = await auth();
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Session } from '@/lib/types';
+import { signIn, signOut, useSession } from 'next-auth/react';
 
-  if (!session?.user) {
-    redirect('/teacher/login');
+export default function TeacherDashboard() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      // For MVP, allow access without auth
+      setLoading(false);
+      fetchSessions();
+    } else if (status === 'authenticated') {
+      fetchSessions();
+    }
+  }, [status]);
+
+  const fetchSessions = async () => {
+    try {
+      const response = await fetch('/api/sessions');
+      const data = await response.json();
+      setSessions(data.sessions || []);
+    } catch (err) {
+      console.error('Failed to fetch sessions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSession = () => {
+    router.push('/teacher/create');
+  };
+
+  const handleViewSession = (sessionId: number) => {
+    router.push(`/teacher/session/${sessionId}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      {/* Header */}
-      <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                QuizClass
-              </Link>
-              <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-                Teacher
-              </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {session.user.name}
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {session.user.email}
-                </div>
-              </div>
-              <SignOut />
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              Teacher Dashboard
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300">
+              Manage your classes and track student progress
+            </p>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
-            Welcome back, {session.user.name?.split(' ')[0]}! 👋
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Manage your classes and track student progress
-          </p>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Link
-            href="/teacher/create"
-            className="group rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 p-6 text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl"
+          <button
+            onClick={() => router.push('/')}
+            className="px-4 py-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
           >
-            <div className="mb-4 text-4xl">➕</div>
-            <h3 className="mb-2 text-xl font-bold">Create New Session</h3>
-            <p className="text-sm text-purple-100">
-              Start a new quiz session for your class
-            </p>
-            <div className="mt-4 flex items-center text-sm font-semibold">
-              Get Started
-              <svg
-                className="ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            ← Back to Home
+          </button>
+        </div>
+
+        {/* Stats cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Sessions</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{sessions.length}</p>
+              </div>
+              <div className="text-4xl">📚</div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active Sessions</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  {sessions.filter(s => s.status === 'active').length}
+                </p>
+              </div>
+              <div className="text-4xl">✅</div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Completed</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  {sessions.filter(s => s.status === 'ended').length}
+                </p>
+              </div>
+              <div className="text-4xl">🎯</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Create new session button */}
+        <button
+          onClick={handleCreateSession}
+          className="w-full md:w-auto mb-8 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold py-4 px-8 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
+        >
+          <span className="text-2xl mr-3">+</span>
+          Create New Session
+        </button>
+
+        {/* Sessions list */}
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+            Your Sessions
+          </h2>
+
+          {sessions.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">📝</div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                No sessions yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Create your first session to get started
+              </p>
+              <button
+                onClick={handleCreateSession}
+                className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+                Create Session
+              </button>
             </div>
-          </Link>
-
-          <div className="rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-800">
-            <div className="mb-4 text-4xl">📚</div>
-            <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-              My Sessions
-            </h3>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-              View and manage your quiz sessions
-            </p>
-            <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-              0
+          ) : (
+            <div className="space-y-4">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-700/50 rounded-2xl hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => handleViewSession(session.id)}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                        {session.title}
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        session.status === 'active'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
+                      }`}>
+                        {session.status === 'active' ? '● Active' : 'Ended'}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400">
+                      <span className="flex items-center">
+                        <span className="mr-2">🔑</span>
+                        Code: <span className="font-bold ml-1">{session.code}</span>
+                      </span>
+                      <span className="flex items-center">
+                        <span className="mr-2">📅</span>
+                        {new Date(session.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewSession(session.id);
+                    }}
+                    className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-6 rounded-xl transition-all"
+                  >
+                    View Details
+                  </button>
+                </div>
+              ))}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              Total sessions
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-800">
-            <div className="mb-4 text-4xl">👥</div>
-            <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-              Total Students
-            </h3>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-              Students who joined your sessions
-            </p>
-            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-              0
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              Unique students
-            </div>
-          </div>
+          )}
         </div>
-
-        {/* Recent Sessions */}
-        <div className="rounded-2xl bg-white p-8 shadow-lg dark:bg-gray-800">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Recent Sessions
-            </h2>
-            <Link
-              href="/teacher/create"
-              className="rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-600"
-            >
-              + New Session
-            </Link>
-          </div>
-
-          {/* Empty State */}
-          <div className="py-12 text-center">
-            <div className="mb-4 text-6xl">📭</div>
-            <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-              No sessions yet
-            </h3>
-            <p className="mb-6 text-gray-600 dark:text-gray-300">
-              Create your first quiz session to get started
-            </p>
-            <Link
-              href="/teacher/create"
-              className="inline-flex items-center rounded-lg bg-purple-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-purple-600"
-            >
-              Create Session
-              <svg
-                className="ml-2 h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </Link>
-          </div>
-        </div>
-
-        {/* Tips Section */}
-        <div className="mt-8 rounded-2xl bg-gradient-to-r from-blue-50 to-purple-50 p-6 dark:from-gray-800 dark:to-gray-700">
-          <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-            💡 Quick Tips
-          </h3>
-          <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Create engaging questions with multiple difficulty levels</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Share the 4-digit code with students to let them join</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Monitor real-time results to identify topics that need review</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Use analytics to track student progress over time</span>
-            </li>
-          </ul>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

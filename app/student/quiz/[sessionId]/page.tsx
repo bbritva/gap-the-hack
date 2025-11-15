@@ -1,102 +1,122 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 import { Question } from '@/lib/types';
 
-export default function QuizPage() {
+export default function QuizPage({ params }: { params: Promise<{ sessionId: string }> }) {
+  const resolvedParams = use(params);
   const router = useRouter();
-  const params = useParams();
-  const sessionId = params.sessionId as string;
-
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [studentId, setStudentId] = useState<string>('');
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [answered, setAnswered] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+  const [studentId, setStudentId] = useState<number | null>(null);
 
   useEffect(() => {
-    const storedStudentId = localStorage.getItem('currentStudentId');
+    const storedStudentId = localStorage.getItem('student_id');
     if (!storedStudentId) {
       router.push('/student/join');
       return;
     }
-    setStudentId(storedStudentId);
+    setStudentId(parseInt(storedStudentId));
 
     // Fetch questions
-    fetch(`/api/questions?sessionId=${sessionId}`)
-      .then((res) => res.json())
-      .then((data) => {
+    fetch(`/api/questions?sessionId=${resolvedParams.sessionId}`)
+      .then(res => res.json())
+      .then(data => {
         setQuestions(data.questions);
         setLoading(false);
-        setStartTime(Date.now());
+        setQuestionStartTime(Date.now());
       })
-      .catch(() => {
-        setLoading(false);
+      .catch(err => {
+        console.error(err);
+        alert('Failed to load questions');
+        router.push('/student/join');
       });
-  }, [sessionId, router]);
+  }, [resolvedParams.sessionId, router]);
 
   const currentQuestion = questions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
-  const handleAnswerSelect = (index: number) => {
-    if (!answered) {
-      setSelectedAnswer(index);
+  const handleAnswerSelect = (answer: number) => {
+    if (!showFeedback) {
+      setSelectedAnswer(answer);
     }
   };
 
   const handleSubmitAnswer = async () => {
-    if (selectedAnswer === null || answered) return;
+    if (selectedAnswer === null || !studentId) return;
 
     setSubmitting(true);
-    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+    const timeTaken = Math.floor((Date.now() - questionStartTime) / 1000);
+    const correct = selectedAnswer === currentQuestion.correct_answer;
 
+    // Calculate points
+    let points = 0;
+    if (correct) {
+      points = 100;
+      // Speed bonus (max 50 points for answers under 5 seconds)
+      if (timeTaken < 5) {
+        points += 50;
+      } else if (timeTaken < 10) {
+        points += 25;
+      }
+      // Streak bonus
+      points += streak * 10;
+    }
+
+    setIsCorrect(correct);
+    setShowFeedback(true);
+
+    if (correct) {
+      setScore(prev => prev + points);
+      setStreak(prev => prev + 1);
+    } else {
+      setStreak(0);
+    }
+
+    // Submit response to backend
     try {
-      const response = await fetch('/api/responses', {
+      await fetch('/api/responses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId,
           questionId: currentQuestion.id,
-          sessionId,
           answer: selectedAnswer,
+          isCorrect: correct,
           timeTaken,
         }),
       });
-
-      const data = await response.json();
-      
-      setIsCorrect(data.response.isCorrect);
-      setAnswered(true);
-      
-      if (data.response.isCorrect) {
-        setScore((prev) => prev + data.response.points);
-        setStreak((prev) => prev + 1);
-      } else {
-        setStreak(0);
-      }
-
-      setSubmitting(false);
     } catch (err) {
-      setSubmitting(false);
+      console.error('Failed to submit response:', err);
     }
+
+    setSubmitting(false);
+
+    // Auto-advance after 2 seconds
+    setTimeout(() => {
+      handleNextQuestion();
+    }, 2000);
   };
 
   const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setSelectedAnswer(null);
-      setAnswered(false);
-      setIsCorrect(false);
-      setStartTime(Date.now());
+    if (isLastQuestion) {
+      // Quiz complete - go to results
+      router.push(`/student/results/${resolvedParams.sessionId}`);
     } else {
-      // Quiz completed
-      router.push(`/student/results/${sessionId}`);
+      setCurrentQuestionIndex(prev => prev + 1);
+      setSelectedAnswer(null);
+      setShowFeedback(false);
+      setIsCorrect(false);
+      setQuestionStartTime(Date.now());
     }
   };
 
@@ -104,10 +124,8 @@ export default function QuizPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="text-center">
-          <div className="mb-4 text-6xl">📚</div>
-          <div className="text-xl font-semibold text-gray-900 dark:text-white">
-            Loading quiz...
-          </div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading quiz...</p>
         </div>
       </div>
     );
@@ -115,49 +133,39 @@ export default function QuizPage() {
 
   if (questions.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
         <div className="text-center">
-          <div className="mb-4 text-6xl">📭</div>
-          <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-            No questions available
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            The teacher hasn't added questions yet.
-          </p>
+          <div className="text-6xl mb-4">📝</div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Questions Yet</h1>
+          <p className="text-gray-600 dark:text-gray-300">Your teacher hasn't added questions to this session.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 py-8">
-      <div className="mx-auto max-w-3xl">
-        {/* Header Stats */}
-        <div className="mb-6 flex items-center justify-between rounded-2xl bg-white p-4 shadow-lg dark:bg-gray-800">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+      {/* Header with stats */}
+      <div className="w-full max-w-4xl mx-auto mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 flex items-center justify-between">
           <div className="flex items-center space-x-6">
             <div className="flex items-center">
-              <span className="mr-2 text-2xl">⭐</span>
+              <span className="text-2xl mr-2">⭐</span>
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Points</div>
-                <div className="text-xl font-bold text-gray-900 dark:text-white">
-                  {score}
-                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Score</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white">{score}</div>
               </div>
             </div>
-            
             {streak > 0 && (
               <div className="flex items-center">
-                <span className="mr-2 text-2xl">🔥</span>
+                <span className="text-2xl mr-2">🔥</span>
                 <div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">Streak</div>
-                  <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {streak}
-                  </div>
+                  <div className="text-xl font-bold text-orange-500">{streak}</div>
                 </div>
               </div>
             )}
           </div>
-
           <div className="text-right">
             <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
             <div className="text-xl font-bold text-gray-900 dark:text-white">
@@ -165,76 +173,73 @@ export default function QuizPage() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Progress Bar */}
-        <div className="mb-6 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+      {/* Progress bar */}
+      <div className="w-full max-w-4xl mx-auto mb-6">
+        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
-            style={{
-              width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
-            }}
-          />
+            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+          ></div>
         </div>
+      </div>
 
-        {/* Question Card */}
-        <div className="rounded-3xl bg-white p-8 shadow-xl dark:bg-gray-800">
-          {/* Topic Badge */}
-          <div className="mb-4 inline-block rounded-full bg-blue-100 px-4 py-1 text-sm font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-            {currentQuestion.topic}
+      {/* Question card */}
+      <div className="w-full max-w-4xl mx-auto flex-1">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
+          {/* Question */}
+          <div className="mb-8">
+            {currentQuestion.topic && (
+              <div className="inline-block px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium mb-4">
+                {currentQuestion.topic}
+              </div>
+            )}
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              {currentQuestion.question_text}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Select the correct answer
+            </p>
           </div>
 
-          {/* Question */}
-          <h2 className="mb-8 text-2xl font-bold text-gray-900 dark:text-white">
-            {currentQuestion.questionText}
-          </h2>
-
           {/* Options */}
-          <div className="mb-8 space-y-3">
+          <div className="space-y-4 mb-8">
             {currentQuestion.options.map((option, index) => {
               const isSelected = selectedAnswer === index;
-              const showCorrect = answered && index === currentQuestion.correctAnswer;
-              const showWrong = answered && isSelected && !isCorrect;
+              const isCorrectAnswer = index === currentQuestion.correct_answer;
+              const showCorrect = showFeedback && isCorrectAnswer;
+              const showIncorrect = showFeedback && isSelected && !isCorrectAnswer;
 
               return (
                 <button
                   key={index}
                   onClick={() => handleAnswerSelect(index)}
-                  disabled={answered}
-                  className={`w-full rounded-xl border-2 p-4 text-left transition-all duration-200 ${
+                  disabled={showFeedback || submitting}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 transform hover:scale-102 ${
                     showCorrect
-                      ? 'border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-900/30'
-                      : showWrong
-                      ? 'border-red-500 bg-red-50 dark:border-red-400 dark:bg-red-900/30'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                      : showIncorrect
+                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
                       : isSelected
-                      ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                      : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500'
-                  } ${answered ? 'cursor-default' : 'cursor-pointer'}`}
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
+                  } ${showFeedback || submitting ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                 >
-                  <div className="flex items-center">
-                    <div
-                      className={`mr-4 flex h-8 w-8 items-center justify-center rounded-full border-2 font-semibold ${
-                        showCorrect
-                          ? 'border-green-500 bg-green-500 text-white'
-                          : showWrong
-                          ? 'border-red-500 bg-red-500 text-white'
-                          : isSelected
-                          ? 'border-blue-500 bg-blue-500 text-white'
-                          : 'border-gray-300 text-gray-600 dark:border-gray-500 dark:text-gray-400'
-                      }`}
-                    >
-                      {showCorrect ? '✓' : showWrong ? '✗' : String.fromCharCode(65 + index)}
-                    </div>
-                    <span
-                      className={`${
-                        showCorrect
-                          ? 'text-green-900 dark:text-green-100'
-                          : showWrong
-                          ? 'text-red-900 dark:text-red-100'
-                          : 'text-gray-900 dark:text-white'
-                      }`}
-                    >
+                  <div className="flex items-center justify-between">
+                    <span className={`font-medium ${
+                      showCorrect
+                        ? 'text-green-700 dark:text-green-300'
+                        : showIncorrect
+                        ? 'text-red-700 dark:text-red-300'
+                        : isSelected
+                        ? 'text-blue-700 dark:text-blue-300'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}>
                       {option}
                     </span>
+                    {showCorrect && <span className="text-2xl">✓</span>}
+                    {showIncorrect && <span className="text-2xl">✗</span>}
                   </div>
                 </button>
               );
@@ -242,51 +247,28 @@ export default function QuizPage() {
           </div>
 
           {/* Feedback */}
-          {answered && (
-            <div
-              className={`mb-6 rounded-xl p-4 ${
-                isCorrect
-                  ? 'bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-                  : 'bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-200'
-              }`}
-            >
-              <div className="flex items-center">
-                <span className="mr-2 text-2xl">{isCorrect ? '🎉' : '💡'}</span>
-                <div>
-                  <div className="font-semibold">
-                    {isCorrect ? 'Correct!' : 'Not quite right'}
-                  </div>
-                  <div className="text-sm">
-                    {isCorrect
-                      ? `Great job! You earned ${currentQuestion.points} points${
-                          streak > 1 ? ` and have a ${streak} streak!` : '!'
-                        }`
-                      : `The correct answer is: ${
-                          currentQuestion.options[currentQuestion.correctAnswer]
-                        }`}
-                  </div>
-                </div>
-              </div>
+          {showFeedback && (
+            <div className={`mb-6 p-4 rounded-xl ${
+              isCorrect
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+            }`}>
+              <p className={`text-center font-semibold ${
+                isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+              }`}>
+                {isCorrect ? '🎉 Correct! Great job!' : '❌ Incorrect. The correct answer is highlighted above.'}
+              </p>
             </div>
           )}
 
-          {/* Action Button */}
-          {!answered ? (
+          {/* Submit button */}
+          {!showFeedback && (
             <button
               onClick={handleSubmitAnswer}
-              disabled={selectedAnswer === null || submitting}
-              className="w-full rounded-xl bg-blue-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!selectedAnswer || submitting}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700 text-white font-bold py-4 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
             >
               {submitting ? 'Submitting...' : 'Submit Answer'}
-            </button>
-          ) : (
-            <button
-              onClick={handleNextQuestion}
-              className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:from-blue-600 hover:to-purple-600"
-            >
-              {currentQuestionIndex < questions.length - 1
-                ? 'Next Question →'
-                : 'See Results 🎯'}
             </button>
           )}
         </div>
