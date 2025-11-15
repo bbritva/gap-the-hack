@@ -153,13 +153,22 @@ export async function updateSessionStatus(
   id: number,
   status: 'active' | 'ended'
 ): Promise<Session | null> {
-  const result = await sql<Session>`
-    UPDATE sessions 
-    SET status = ${status}, 
-        ${status === 'active' ? sql`started_at = CURRENT_TIMESTAMP` : sql`ended_at = CURRENT_TIMESTAMP`}
-    WHERE id = ${id}
-    RETURNING *
-  `;
+  let result;
+  if (status === 'active') {
+    result = await sql<Session>`
+      UPDATE sessions 
+      SET status = ${status}, started_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING *
+    `;
+  } else {
+    result = await sql<Session>`
+      UPDATE sessions 
+      SET status = ${status}, ended_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING *
+    `;
+  }
   return result.rows[0] || null;
 }
 

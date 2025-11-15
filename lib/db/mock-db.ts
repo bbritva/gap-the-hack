@@ -79,9 +79,10 @@ export async function createQuestion(
   sessionId: number,
   questionText: string,
   options: string[],
-  correctAnswer: string,
+  correctAnswer: number,
   topic?: string,
-  difficulty: 'easy' | 'medium' | 'hard' = 'medium',
+  difficulty: 'foundation' | 'application' | 'analysis' = 'application',
+  points: number = 100,
   orderIndex: number = 0
 ): Promise<Question> {
   const question: Question = {
@@ -92,6 +93,7 @@ export async function createQuestion(
     correct_answer: correctAnswer,
     topic,
     difficulty,
+    points,
     order_index: orderIndex,
     created_at: new Date(),
   };
@@ -251,9 +253,10 @@ export async function seedDemoData() {
     session.id,
     'What is the powerhouse of the cell?',
     ['Nucleus', 'Mitochondria', 'Ribosome', 'Chloroplast'],
-    'Mitochondria',
+    1,
     'Cell Biology',
-    'easy',
+    'foundation',
+    100,
     0
   );
   
@@ -261,9 +264,10 @@ export async function seedDemoData() {
     session.id,
     'Which process do plants use to make food?',
     ['Respiration', 'Photosynthesis', 'Fermentation', 'Digestion'],
-    'Photosynthesis',
+    1,
     'Plant Biology',
-    'easy',
+    'foundation',
+    100,
     1
   );
   
@@ -271,9 +275,10 @@ export async function seedDemoData() {
     session.id,
     'What is DNA an abbreviation for?',
     ['Deoxyribonucleic Acid', 'Dinitrogen Acid', 'Dual Nuclear Acid', 'Dynamic Nucleic Acid'],
-    'Deoxyribonucleic Acid',
+    0,
     'Genetics',
-    'medium',
+    'application',
+    100,
     2
   );
   
@@ -281,9 +286,10 @@ export async function seedDemoData() {
     session.id,
     'How many chromosomes do humans have?',
     ['23', '46', '48', '92'],
-    '46',
+    1,
     'Genetics',
-    'medium',
+    'application',
+    100,
     3
   );
   
@@ -291,9 +297,10 @@ export async function seedDemoData() {
     session.id,
     'What is the largest organ in the human body?',
     ['Heart', 'Liver', 'Skin', 'Brain'],
-    'Skin',
+    2,
     'Human Anatomy',
-    'easy',
+    'foundation',
+    100,
     4
   );
   

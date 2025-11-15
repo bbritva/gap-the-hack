@@ -71,7 +71,6 @@ export interface LeaderboardEntry {
   totalQuestions: number;
   streak: number;
 }
-}
 
 export interface QuestionStat {
   questionId: number;
@@ -97,7 +96,28 @@ export interface SessionStats {
   averageScore: number;
   questionStats: {
     questionId: number;
+    questionText: string;
+    topic?: string;
     correctPercentage: number;
+    totalResponses: number;
     averageTime: number;
   }[];
+}
+
+export interface StudentScore {
+  studentId: string;
+  studentName: string;
+  totalPoints: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  streak: number;
+}
+
+export interface QuestionStats {
+  questionId: string;
+  questionText: string;
+  topic?: string;
+  correctCount: number;
+  totalCount: number;
+  averageTime: number;
 }
