@@ -5,6 +5,17 @@ import { verifyTeacherPassword, createTeacher } from "@/lib/db";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  cookies: {
+    pkceCodeVerifier: {
+      name: "next-auth.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
