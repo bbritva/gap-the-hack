@@ -1,59 +1,131 @@
-import Image from "next/image";
-import { auth } from "@/auth";
-import { SignIn } from "./components/sign-in";
-import { UserInfo } from "./components/user-info";
+import Link from "next/link";
 
-export default async function Home() {
-  const session = await auth();
-
+export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            {session?.user
-              ? `Welcome back, ${session.user.name?.split(" ")[0]}!`
-              : "Welcome to Next.js"}
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <main className="flex w-full max-w-6xl flex-col items-center justify-center px-6 py-12">
+        {/* Header */}
+        <div className="mb-16 text-center">
+          <h1 className="mb-4 text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl">
+            QuizClass
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            {session?.user
-              ? "You are successfully authenticated with Google."
-              : "Sign in with your Google account to get started."}
+          <p className="text-xl text-gray-600 dark:text-gray-300">
+            Interactive learning made fun and engaging
           </p>
-          {session?.user ? <UserInfo /> : <SignIn />}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* Role Selection Cards */}
+        <div className="grid w-full max-w-4xl gap-8 md:grid-cols-2">
+          {/* Student Card */}
+          <Link
+            href="/student/join"
+            className="group relative overflow-hidden rounded-3xl bg-white p-8 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl dark:bg-gray-800"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <div className="absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-blue-100 opacity-50 transition-transform duration-300 group-hover:scale-150 dark:bg-blue-900"></div>
+            
+            <div className="relative z-10">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-500 text-4xl shadow-lg">
+                🎓
+              </div>
+              
+              <h2 className="mb-3 text-3xl font-bold text-gray-900 dark:text-white">
+                I'm a Student
+              </h2>
+              
+              <p className="mb-6 text-gray-600 dark:text-gray-300">
+                Join your class with a code and start learning through fun, interactive quizzes
+              </p>
+              
+              <div className="flex items-center text-blue-600 dark:text-blue-400">
+                <span className="font-semibold">Join Class</span>
+                <svg
+                  className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
+          {/* Teacher Card */}
+          <Link
+            href="/teacher/dashboard"
+            className="group relative overflow-hidden rounded-3xl bg-white p-8 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl dark:bg-gray-800"
           >
-            Documentation
-          </a>
+            <div className="absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-purple-100 opacity-50 transition-transform duration-300 group-hover:scale-150 dark:bg-purple-900"></div>
+            
+            <div className="relative z-10">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-purple-500 text-4xl shadow-lg">
+                👨‍🏫
+              </div>
+              
+              <h2 className="mb-3 text-3xl font-bold text-gray-900 dark:text-white">
+                I'm a Teacher
+              </h2>
+              
+              <p className="mb-6 text-gray-600 dark:text-gray-300">
+                Create engaging quizzes, track student progress, and get real-time insights
+              </p>
+              
+              <div className="flex items-center text-purple-600 dark:text-purple-400">
+                <span className="font-semibold">Go to Dashboard</span>
+                <svg
+                  className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Features */}
+        <div className="mt-20 grid w-full max-w-4xl gap-6 text-center md:grid-cols-3">
+          <div className="rounded-2xl bg-white/50 p-6 backdrop-blur-sm dark:bg-gray-800/50">
+            <div className="mb-3 text-3xl">⚡</div>
+            <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
+              Real-time Engagement
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Live quizzes with instant feedback and leaderboards
+            </p>
+          </div>
+          
+          <div className="rounded-2xl bg-white/50 p-6 backdrop-blur-sm dark:bg-gray-800/50">
+            <div className="mb-3 text-3xl">🎮</div>
+            <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
+              Gamified Learning
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Points, streaks, and achievements to boost motivation
+            </p>
+          </div>
+          
+          <div className="rounded-2xl bg-white/50 p-6 backdrop-blur-sm dark:bg-gray-800/50">
+            <div className="mb-3 text-3xl">📊</div>
+            <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
+              Smart Analytics
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Track understanding and identify knowledge gaps
+            </p>
+          </div>
         </div>
       </main>
     </div>
