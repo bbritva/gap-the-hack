@@ -1,52 +1,107 @@
-// Core data types for the quiz application
+// Database types for QuizClass
 
 export interface Teacher {
-  id: string;
+  id: number;
   email: string;
   name: string;
-  createdAt: Date;
+  created_at: Date;
 }
 
 export interface Session {
-  id: string;
-  teacherId: string;
+  id: number;
+  teacher_id: number;
   title: string;
-  code: string; // 4-digit code
+  code: string;
   status: 'active' | 'ended';
-  createdAt: Date;
-  startedAt?: Date;
-  endedAt?: Date;
+  created_at: Date;
+  started_at?: Date;
+  ended_at?: Date;
 }
 
 export interface Question {
-  id: string;
-  sessionId: string;
-  questionText: string;
+  id: number;
+  session_id: number;
+  question_text: string;
   options: string[];
-  correctAnswer: number; // index of correct option
-  topic: string;
+  correct_answer: number;
+  topic?: string;
   difficulty: 'foundation' | 'application' | 'analysis';
   points: number;
+  order_index: number;
+  created_at: Date;
 }
 
 export interface Student {
-  id: string;
+  id: number;
+  session_id: number;
   name: string;
-  sessionId: string;
-  interests: string[];
-  joinedAt: Date;
+  interests?: string[];
+  joined_at: Date;
 }
 
 export interface Response {
-  id: string;
-  studentId: string;
-  questionId: string;
-  sessionId: string;
-  answer: number; // selected option index
-  isCorrect: boolean;
-  timeTaken: number; // in seconds
-  points: number;
-  submittedAt: Date;
+  id: number;
+  student_id: number;
+  question_id: number;
+  answer: string;
+  is_correct: boolean;
+  time_taken?: number;
+  created_at: Date;
+}
+
+// Client-side types
+export interface StudentProfile {
+  name: string;
+  interests: string[];
+}
+
+export interface QuizState {
+  currentQuestionIndex: number;
+  answers: Record<number, string>;
+  score: number;
+  streak: number;
+  startTime: number;
+}
+
+export interface LeaderboardEntry {
+  studentId: number;
+  studentName: string;
+  totalPoints: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  streak: number;
+}
+
+export interface QuestionStat {
+  questionId: number;
+  questionText: string;
+  topic: string;
+  successRate: number;
+  correctResponses: number;
+  totalResponses: number;
+  averageTime: number;
+}
+
+export interface SessionAnalytics {
+  totalStudents: number;
+  totalQuestions: number;
+  averageScore: number;
+  leaderboard: LeaderboardEntry[];
+  questionStats: QuestionStat[];
+}
+
+export interface SessionStats {
+  totalStudents: number;
+  activeStudents: number;
+  averageScore: number;
+  questionStats: {
+    questionId: number;
+    questionText: string;
+    topic?: string;
+    correctPercentage: number;
+    totalResponses: number;
+    averageTime: number;
+  }[];
 }
 
 export interface StudentScore {
@@ -56,39 +111,13 @@ export interface StudentScore {
   correctAnswers: number;
   totalQuestions: number;
   streak: number;
-  rank?: number;
 }
 
 export interface QuestionStats {
   questionId: string;
   questionText: string;
-  topic: string;
-  totalResponses: number;
-  correctResponses: number;
+  topic?: string;
+  correctCount: number;
+  totalCount: number;
   averageTime: number;
-  successRate: number;
 }
-
-export interface SessionAnalytics {
-  sessionId: string;
-  totalStudents: number;
-  totalQuestions: number;
-  averageScore: number;
-  questionStats: QuestionStats[];
-  topicPerformance: { [topic: string]: number };
-  leaderboard: StudentScore[];
-}
-
-// Interest options for students
-export const INTEREST_OPTIONS = [
-  { id: 'sports', label: 'Sports', emoji: '⚽' },
-  { id: 'music', label: 'Music', emoji: '🎵' },
-  { id: 'technology', label: 'Technology', emoji: '💻' },
-  { id: 'art', label: 'Art', emoji: '🎨' },
-  { id: 'science', label: 'Science', emoji: '🔬' },
-  { id: 'gaming', label: 'Gaming', emoji: '🎮' },
-  { id: 'reading', label: 'Reading', emoji: '📚' },
-  { id: 'nature', label: 'Nature', emoji: '🌿' },
-] as const;
-
-export type InterestId = typeof INTEREST_OPTIONS[number]['id'];
