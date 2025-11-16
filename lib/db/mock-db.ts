@@ -40,13 +40,14 @@ export async function getTeacherByEmail(email: string): Promise<Teacher | null> 
 }
 
 // Session operations
-export async function createSession(teacherId: number, title: string): Promise<Session> {
+export async function createSession(teacherId: number, title: string, expectedStudents?: number): Promise<Session> {
   const session: Session = {
     id: sessionId++,
     teacher_id: teacherId,
     title,
     code: generateSessionCode(),
     status: 'active',
+    expected_students: expectedStudents,
     created_at: new Date(),
     started_at: new Date(),
   };

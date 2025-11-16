@@ -15,6 +15,7 @@ export interface Session {
   title: string;
   code: string;
   status: 'active' | 'ended';
+  expected_students?: number;
   created_at: Date;
   started_at?: Date;
   ended_at?: Date;

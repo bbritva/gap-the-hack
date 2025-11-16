@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   title VARCHAR(255) NOT NULL,
   code VARCHAR(4) UNIQUE NOT NULL,
   status VARCHAR(20) DEFAULT 'active', -- active, ended
+  expected_students INTEGER, -- Expected number of students
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   started_at TIMESTAMP,
   ended_at TIMESTAMP
