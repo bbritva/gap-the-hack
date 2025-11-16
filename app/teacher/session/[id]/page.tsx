@@ -147,7 +147,11 @@ export default function SessionViewPage({ params }: { params: Promise<{ id: stri
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Students</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalStudents}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {session.expected_students 
+                    ? `${stats.totalStudents}/${session.expected_students}`
+                    : stats.totalStudents}
+                </p>
               </div>
               <div className="text-4xl">👥</div>
             </div>

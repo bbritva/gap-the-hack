@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function CreateSessionPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
+  const [expectedStudents, setExpectedStudents] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,6 +57,11 @@ export default function CreateSessionPage() {
       return false;
     }
 
+    if (expectedStudents && (parseInt(expectedStudents) < 1 || isNaN(parseInt(expectedStudents)))) {
+      setError('Expected students must be a positive number');
+      return false;
+    }
+
     if (!uploadedFile) {
       setError('Please upload a PDF file');
       return false;
@@ -82,6 +88,7 @@ export default function CreateSessionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
+          expected_students: expectedStudents ? parseInt(expectedStudents) : undefined,
           questions: [], // Empty for now - PDF processing would generate these
         }),
       });
@@ -138,6 +145,26 @@ export default function CreateSessionPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               disabled={loading}
             />
+          </div>
+
+          {/* Expected Students */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <label htmlFor="expectedStudents" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Expected Number of Students (Optional)
+            </label>
+            <input
+              type="number"
+              id="expectedStudents"
+              value={expectedStudents}
+              onChange={(e) => setExpectedStudents(e.target.value)}
+              placeholder="e.g., 25"
+              min="1"
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              disabled={loading}
+            />
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              This helps you track how many students have joined vs. expected
+            </p>
           </div>
 
           {/* File Upload Area */}
