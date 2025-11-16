@@ -4,10 +4,16 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Question } from '@/lib/types';
 
+interface PersonalizedQuestion extends Question {
+  personalizedText?: string;
+  personalizedOptions?: string[];
+  usedInterest?: string;
+}
+
 export default function QuizPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<PersonalizedQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [score, setScore] = useState(0);
@@ -18,6 +24,7 @@ export default function QuizPage({ params }: { params: Promise<{ sessionId: stri
   const [isCorrect, setIsCorrect] = useState(false);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
   const [studentId, setStudentId] = useState<number | null>(null);
+  const [personalizing, setPersonalizing] = useState(false);
 
   useEffect(() => {
     const storedStudentId = localStorage.getItem('student_id');
@@ -27,23 +34,97 @@ export default function QuizPage({ params }: { params: Promise<{ sessionId: stri
     }
     setStudentId(parseInt(storedStudentId));
 
-    // Fetch questions
-    fetch(`/api/questions?sessionId=${resolvedParams.sessionId}`)
-      .then(res => res.json())
-      .then(data => {
-        setQuestions(data.questions);
-        setLoading(false);
-        setQuestionStartTime(Date.now());
-      })
-      .catch(err => {
-        console.error(err);
-        alert('Failed to load questions');
-        router.push('/student/join');
-      });
+    loadAndPersonalizeQuestions();
   }, [resolvedParams.sessionId, router]);
+
+  const loadAndPersonalizeQuestions = async () => {
+    try {
+      // Fetch questions
+      const questionsRes = await fetch(`/api/questions?sessionId=${resolvedParams.sessionId}`);
+      const questionsData = await questionsRes.json();
+      
+      if (!questionsData.questions || questionsData.questions.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Get student interests from localStorage
+      const storedInterests = localStorage.getItem('student_interests');
+      const studentInterests: string[] = storedInterests ? JSON.parse(storedInterests) : [];
+
+      console.log('Student interests:', studentInterests);
+
+      // If student has interests, personalize questions
+      if (studentInterests.length > 0) {
+        setPersonalizing(true);
+        const personalizedQuestions = await Promise.all(
+          questionsData.questions.map(async (question: Question) => {
+            try {
+              // Personalize each question
+              const response = await fetch('/api/questions/personalize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  questionText: question.question_text,
+                  options: {
+                    A: question.options[0],
+                    B: question.options[1],
+                    C: question.options[2],
+                    D: question.options[3]
+                  },
+                  studentInterests: studentInterests.slice(0, 3), // Max 3 interests
+                  concept: question.topic || 'General'
+                }),
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                console.log('Personalized question:', data);
+                
+                return {
+                  ...question,
+                  personalizedText: data.personalizedQuestion,
+                  personalizedOptions: [
+                    data.options.A,
+                    data.options.B,
+                    data.options.C,
+                    data.options.D
+                  ],
+                  usedInterest: data.usedInterest
+                };
+              } else {
+                console.warn('Failed to personalize question, using original');
+                return question;
+              }
+            } catch (error) {
+              console.error('Error personalizing question:', error);
+              return question;
+            }
+          })
+        );
+
+        setQuestions(personalizedQuestions);
+        setPersonalizing(false);
+      } else {
+        // No interests, use original questions
+        setQuestions(questionsData.questions);
+      }
+
+      setLoading(false);
+      setQuestionStartTime(Date.now());
+    } catch (err) {
+      console.error('Error loading questions:', err);
+      alert('Failed to load questions');
+      router.push('/student/join');
+    }
+  };
 
   const currentQuestion = questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  
+  // Use personalized text/options if available, otherwise use original
+  const displayQuestion = currentQuestion?.personalizedText || currentQuestion?.question_text;
+  const displayOptions = currentQuestion?.personalizedOptions || currentQuestion?.options;
 
   const handleAnswerSelect = (answer: number) => {
     if (!showFeedback) {
@@ -120,12 +201,19 @@ export default function QuizPage({ params }: { params: Promise<{ sessionId: stri
     }
   };
 
-  if (loading) {
+  if (loading || personalizing) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading quiz...</p>
+          <p className="text-gray-600 dark:text-gray-300">
+            {personalizing ? 'Personalizing your quiz...' : 'Loading quiz...'}
+          </p>
+          {personalizing && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Making questions more engaging based on your interests ✨
+            </p>
+          )}
         </div>
       </div>
     );
@@ -190,13 +278,20 @@ export default function QuizPage({ params }: { params: Promise<{ sessionId: stri
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
           {/* Question */}
           <div className="mb-8">
-            {currentQuestion.topic && (
-              <div className="inline-block px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium mb-4">
-                {currentQuestion.topic}
-              </div>
-            )}
+            <div className="flex items-center gap-2 mb-4">
+              {currentQuestion.topic && (
+                <div className="inline-block px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium">
+                  {currentQuestion.topic}
+                </div>
+              )}
+              {currentQuestion.usedInterest && (
+                <div className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
+                  ✨ {currentQuestion.usedInterest}
+                </div>
+              )}
+            </div>
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              {currentQuestion.question_text}
+              {displayQuestion}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Select the correct answer
@@ -205,7 +300,7 @@ export default function QuizPage({ params }: { params: Promise<{ sessionId: stri
 
           {/* Options */}
           <div className="space-y-4 mb-8">
-            {currentQuestion.options.map((option, index) => {
+            {displayOptions?.map((option, index) => {
               const isSelected = selectedAnswer === index;
               const isCorrectAnswer = index === currentQuestion.correct_answer;
               const showCorrect = showFeedback && isCorrectAnswer;

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PDFUpload from '@/app/components/pdf-upload';
 
 interface QuestionForm {
   question_text: string;
@@ -13,6 +14,7 @@ interface QuestionForm {
 
 export default function CreateSessionPage() {
   const router = useRouter();
+  const [createMode, setCreateMode] = useState<'manual' | 'pdf'>('pdf');
   const [title, setTitle] = useState('');
   const [questions, setQuestions] = useState<QuestionForm[]>([
     {
@@ -25,6 +27,7 @@ export default function CreateSessionPage() {
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const addQuestion = () => {
     setQuestions([
@@ -125,6 +128,21 @@ export default function CreateSessionPage() {
     }
   };
 
+  const handlePDFUploadSuccess = (data: any) => {
+    setSuccess(`Session created successfully! Code: ${data.code}`);
+    if (data.extractionFailed) {
+      setError(data.message);
+    }
+    // Redirect to session page after 2 seconds
+    setTimeout(() => {
+      router.push(`/teacher/session/${data.sessionId}`);
+    }, 2000);
+  };
+
+  const handlePDFUploadError = (errorMessage: string) => {
+    setError(errorMessage);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
       <div className="max-w-4xl mx-auto">
@@ -143,11 +161,67 @@ export default function CreateSessionPage() {
             Create New Session
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Set up your quiz questions for the class
+            Upload a PDF or manually create quiz questions
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Mode Selection */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={() => setCreateMode('pdf')}
+              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                createMode === 'pdf'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Upload PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateMode('manual')}
+              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                createMode === 'manual'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Manually
+            </button>
+          </div>
+        </div>
+
+        {/* Success Message */}
+        {success && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-6">
+            <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* PDF Upload Mode */}
+        {createMode === 'pdf' ? (
+          <PDFUpload
+            onUploadSuccess={handlePDFUploadSuccess}
+            onUploadError={handlePDFUploadError}
+          />
+        ) : (
+          /* Manual Creation Mode */
+          <form onSubmit={handleSubmit} className="space-y-6">
           {/* Session title */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -311,6 +385,7 @@ export default function CreateSessionPage() {
             )}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

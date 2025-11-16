@@ -13,6 +13,10 @@ export interface Session {
   title: string;
   code: string;
   status: 'active' | 'ended';
+  courseContent?: string; // Full PDF text content
+  quizTimeLimit?: number; // Total time for entire quiz in seconds
+  quizStatus?: 'not_started' | 'in_progress' | 'completed';
+  quizStartedAt?: Date; // When teacher started the quiz
   created_at: Date;
   started_at?: Date;
   ended_at?: Date;
