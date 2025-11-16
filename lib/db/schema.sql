@@ -5,8 +5,6 @@ CREATE TABLE IF NOT EXISTS teachers (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
-  username VARCHAR(255) UNIQUE,
-  password_hash VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -61,4 +59,3 @@ CREATE INDEX IF NOT EXISTS idx_sessions_teacher ON sessions(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_students_session ON students(session_id);
 CREATE INDEX IF NOT EXISTS idx_responses_student ON responses(student_id);
 CREATE INDEX IF NOT EXISTS idx_responses_question ON responses(question_id);
-CREATE INDEX IF NOT EXISTS idx_teachers_username ON teachers(username);

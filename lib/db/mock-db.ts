@@ -1,18 +1,39 @@
 // Mock database for MVP - Replace with Vercel Postgres later
 import { Session, Question, Student, Response, Teacher } from '../types';
 
-// In-memory storage
-let teachers: Teacher[] = [];
-let sessions: Session[] = [];
-let questions: Question[] = [];
-let students: Student[] = [];
-let responses: Response[] = [];
+// Use global to persist data across hot reloads in development
+const globalForDb = global as unknown as {
+  teachers: Teacher[];
+  sessions: Session[];
+  questions: Question[];
+  students: Student[];
+  responses: Response[];
+  teacherId: number;
+  sessionId: number;
+  questionId: number;
+  studentId: number;
+  responseId: number;
+};
 
-let teacherId = 1;
-let sessionId = 1;
-let questionId = 1;
-let studentId = 1;
-let responseId = 1;
+// Initialize or reuse existing data
+const teachers = globalForDb.teachers || [];
+const sessions = globalForDb.sessions || [];
+const questions = globalForDb.questions || [];
+const students = globalForDb.students || [];
+const responses = globalForDb.responses || [];
+
+let teacherId = globalForDb.teacherId || 1;
+let sessionId = globalForDb.sessionId || 1;
+let questionId = globalForDb.questionId || 1;
+let studentId = globalForDb.studentId || 1;
+let responseId = globalForDb.responseId || 1;
+
+// Store in global to persist across hot reloads
+globalForDb.teachers = teachers;
+globalForDb.sessions = sessions;
+globalForDb.questions = questions;
+globalForDb.students = students;
+globalForDb.responses = responses;
 
 // Helper to generate 4-digit code
 export function generateSessionCode(): string {
@@ -32,6 +53,7 @@ export async function createTeacher(email: string, name: string): Promise<Teache
     created_at: new Date(),
   };
   teachers.push(teacher);
+  globalForDb.teacherId = teacherId;
   return teacher;
 }
 
@@ -40,18 +62,29 @@ export async function getTeacherByEmail(email: string): Promise<Teacher | null> 
 }
 
 // Session operations
-export async function createSession(teacherId: number, title: string, expectedStudents?: number): Promise<Session> {
+export async function createSession(teacherId: number, title: string, courseContent?: string): Promise<Session> {
   const session: Session = {
     id: sessionId++,
     teacher_id: teacherId,
     title,
     code: generateSessionCode(),
     status: 'active',
-    expected_students: expectedStudents,
+    courseContent,
     created_at: new Date(),
     started_at: new Date(),
   };
   sessions.push(session);
+  globalForDb.sessionId = sessionId;
+  
+  console.log('[DB] Session created:', {
+    id: session.id,
+    title: session.title,
+    code: session.code,
+    hasCourseContent: !!courseContent,
+    contentLength: courseContent?.length || 0,
+    totalSessions: sessions.length
+  });
+  
   return session;
 }
 
@@ -60,7 +93,14 @@ export async function getSessionByCode(code: string): Promise<Session | null> {
 }
 
 export async function getSessionById(id: number): Promise<Session | null> {
-  return sessions.find(s => s.id === id) || null;
+  const session = sessions.find(s => s.id === id) || null;
+  console.log('[DB] getSessionById:', {
+    requestedId: id,
+    found: !!session,
+    totalSessions: sessions.length,
+    allSessionIds: sessions.map(s => ({ id: s.id, title: s.title, code: s.code }))
+  });
+  return session;
 }
 
 export async function getSessionsByTeacher(teacherId: number): Promise<Session[]> {
@@ -73,6 +113,48 @@ export async function endSession(id: number): Promise<void> {
     session.status = 'ended';
     session.ended_at = new Date();
   }
+}
+
+export async function updateSessionQuizSettings(
+  id: number,
+  quizTimeLimit: number
+): Promise<Session | null> {
+  const session = sessions.find(s => s.id === id);
+  if (session) {
+    session.quizTimeLimit = quizTimeLimit;
+    session.quizStatus = 'not_started';
+    console.log('[DB] Session quiz settings updated:', {
+      sessionId: id,
+      quizTimeLimit,
+      quizStatus: 'not_started'
+    });
+  }
+  return session || null;
+}
+
+export async function startQuiz(id: number): Promise<Session | null> {
+  const session = sessions.find(s => s.id === id);
+  if (session) {
+    session.quizStatus = 'in_progress';
+    session.quizStartedAt = new Date();
+    console.log('[DB] Quiz started:', {
+      sessionId: id,
+      startedAt: session.quizStartedAt,
+      timeLimit: session.quizTimeLimit
+    });
+  }
+  return session || null;
+}
+
+export async function completeQuiz(id: number): Promise<Session | null> {
+  const session = sessions.find(s => s.id === id);
+  if (session) {
+    session.quizStatus = 'completed';
+    console.log('[DB] Quiz completed:', {
+      sessionId: id
+    });
+  }
+  return session || null;
 }
 
 // Question operations
@@ -99,13 +181,29 @@ export async function createQuestion(
     created_at: new Date(),
   };
   questions.push(question);
+  globalForDb.questionId = questionId;
+  
+  console.log('[DB] Question created:', {
+    id: question.id,
+    sessionId: question.session_id,
+    text: questionText.substring(0, 50) + '...',
+    totalQuestions: questions.length
+  });
+  
   return question;
 }
 
 export async function getQuestionsBySession(sessionId: number): Promise<Question[]> {
-  return questions
+  const sessionQuestions = questions
     .filter(q => q.session_id === sessionId)
     .sort((a, b) => a.order_index - b.order_index);
+  
+  console.log('[DB] getQuestionsBySession:', {
+    sessionId,
+    count: sessionQuestions.length
+  });
+  
+  return sessionQuestions;
 }
 
 export async function getQuestionById(id: number): Promise<Question | null> {
@@ -126,6 +224,7 @@ export async function createStudent(
     joined_at: new Date(),
   };
   students.push(student);
+  globalForDb.studentId = studentId;
   return student;
 }
 
@@ -155,6 +254,7 @@ export async function createResponse(
     created_at: new Date(),
   };
   responses.push(response);
+  globalForDb.responseId = responseId;
   return response;
 }
 
@@ -208,6 +308,7 @@ export async function getSessionStats(sessionId: number) {
     activeStudents: totalStudents,
     averageScore,
     questionStats,
+    students: sessionStudents,
   };
 }
 
@@ -306,4 +407,16 @@ export async function seedDemoData() {
   );
   
   return { teacher, session };
+}
+
+// Debug function to check database state
+export function getDbState() {
+  return {
+    teachers: teachers.length,
+    sessions: sessions.length,
+    questions: questions.length,
+    students: students.length,
+    responses: responses.length,
+    sessionDetails: sessions.map(s => ({ id: s.id, title: s.title, code: s.code }))
+  };
 }

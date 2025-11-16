@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Session } from '@/lib/types';
-import { signOut, useSession } from 'next-auth/react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,11 +15,13 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/teacher/login');
+      // For MVP, allow access without auth
+      setLoading(false);
+      fetchSessions();
     } else if (status === 'authenticated') {
       fetchSessions();
     }
-  }, [status, router]);
+  }, [status]);
 
   const fetchSessions = async () => {
     try {
@@ -41,7 +43,7 @@ export default function TeacherDashboard() {
     router.push(`/teacher/session/${sessionId}`);
   };
 
-  if (loading || status === 'loading') {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="text-center">
@@ -50,10 +52,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
     );
-  }
-
-  if (status === 'unauthenticated') {
-    return null;
   }
 
   return (
@@ -66,23 +64,15 @@ export default function TeacherDashboard() {
               Teacher Dashboard
             </h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Welcome back, {session?.user?.name || 'Teacher'}!
+              Manage your classes and track student progress
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Signed in as</p>
-              <p className="font-medium text-gray-900 dark:text-white">
-                {session?.user?.email || session?.user?.name}
-              </p>
-            </div>
-            <button
-              onClick={() => signOut({ callbackUrl: '/' })}
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium"
-            >
-              Sign Out
-            </button>
-          </div>
+          <button
+            onClick={() => router.push('/')}
+            className="px-4 py-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+          >
+            ← Back to Home
+          </button>
         </div>
 
         {/* Stats cards */}

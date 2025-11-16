@@ -1,54 +1,63 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PDFUpload from '@/app/components/pdf-upload';
+
+interface QuestionForm {
+  question_text: string;
+  options: string[];
+  correct_answer: string;
+  topic: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
 
 export default function CreateSessionPage() {
   const router = useRouter();
+  const [createMode, setCreateMode] = useState<'manual' | 'pdf'>('pdf');
   const [title, setTitle] = useState('');
-  const [expectedStudents, setExpectedStudents] = useState('');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [questions, setQuestions] = useState<QuestionForm[]>([
+    {
+      question_text: '',
+      options: ['', '', '', ''],
+      correct_answer: '',
+      topic: '',
+      difficulty: 'medium',
+    },
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
+  const addQuestion = () => {
+    setQuestions([
+      ...questions,
+      {
+        question_text: '',
+        options: ['', '', '', ''],
+        correct_answer: '',
+        topic: '',
+        difficulty: 'medium',
+      },
+    ]);
+  };
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find(file => file.type === 'application/pdf');
-
-    if (pdfFile) {
-      setUploadedFile(pdfFile);
-      setError('');
-    } else {
-      setError('Please drop a PDF file');
-    }
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      setUploadedFile(file);
-      setError('');
-    } else {
-      setError('Please select a PDF file');
+  const removeQuestion = (index: number) => {
+    if (questions.length > 1) {
+      setQuestions(questions.filter((_, i) => i !== index));
     }
   };
 
-  const removeFile = () => {
-    setUploadedFile(null);
+  const updateQuestion = (index: number, field: keyof QuestionForm, value: any) => {
+    const updated = [...questions];
+    updated[index] = { ...updated[index], [field]: value };
+    setQuestions(updated);
+  };
+
+  const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
+    const updated = [...questions];
+    updated[questionIndex].options[optionIndex] = value;
+    setQuestions(updated);
   };
 
   const validateForm = (): boolean => {
@@ -57,14 +66,24 @@ export default function CreateSessionPage() {
       return false;
     }
 
-    if (expectedStudents && (parseInt(expectedStudents) < 1 || isNaN(parseInt(expectedStudents)))) {
-      setError('Expected students must be a positive number');
-      return false;
-    }
-
-    if (!uploadedFile) {
-      setError('Please upload a PDF file');
-      return false;
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.question_text.trim()) {
+        setError(`Question ${i + 1}: Please enter a question`);
+        return false;
+      }
+      if (q.options.some(opt => !opt.trim())) {
+        setError(`Question ${i + 1}: All options must be filled`);
+        return false;
+      }
+      if (!q.correct_answer.trim()) {
+        setError(`Question ${i + 1}: Please select a correct answer`);
+        return false;
+      }
+      if (!q.options.includes(q.correct_answer)) {
+        setError(`Question ${i + 1}: Correct answer must match one of the options`);
+        return false;
+      }
     }
 
     return true;
@@ -81,15 +100,16 @@ export default function CreateSessionPage() {
     setLoading(true);
 
     try {
-      // For now, we'll create a session without questions
-      // In the future, this would process the PDF to generate questions
+      // Create session
       const sessionResponse = await fetch('/api/sessions/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          expected_students: expectedStudents ? parseInt(expectedStudents) : undefined,
-          questions: [], // Empty for now - PDF processing would generate these
+          questions: questions.map((q, index) => ({
+            ...q,
+            order_index: index,
+          })),
         }),
       });
 
@@ -108,9 +128,24 @@ export default function CreateSessionPage() {
     }
   };
 
+  const handlePDFUploadSuccess = (data: any) => {
+    setSuccess(`Session created successfully! Code: ${data.code}`);
+    if (data.extractionFailed) {
+      setError(data.message);
+    }
+    // Redirect to session page after 2 seconds
+    setTimeout(() => {
+      router.push(`/teacher/session/${data.sessionId}`);
+    }, 2000);
+  };
+
+  const handlePDFUploadError = (errorMessage: string) => {
+    setError(errorMessage);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <button
@@ -126,11 +161,67 @@ export default function CreateSessionPage() {
             Create New Session
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Upload a PDF document to generate quiz questions
+            Upload a PDF or manually create quiz questions
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Mode Selection */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={() => setCreateMode('pdf')}
+              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                createMode === 'pdf'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Upload PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateMode('manual')}
+              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                createMode === 'manual'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Manually
+            </button>
+          </div>
+        </div>
+
+        {/* Success Message */}
+        {success && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-6">
+            <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* PDF Upload Mode */}
+        {createMode === 'pdf' ? (
+          <PDFUpload
+            onUploadSuccess={handlePDFUploadSuccess}
+            onUploadError={handlePDFUploadError}
+          />
+        ) : (
+          /* Manual Creation Mode */
+          <form onSubmit={handleSubmit} className="space-y-6">
           {/* Session title */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -147,124 +238,126 @@ export default function CreateSessionPage() {
             />
           </div>
 
-          {/* Expected Students */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <label htmlFor="expectedStudents" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Expected Number of Students (Optional)
-            </label>
-            <input
-              type="number"
-              id="expectedStudents"
-              value={expectedStudents}
-              onChange={(e) => setExpectedStudents(e.target.value)}
-              placeholder="e.g., 25"
-              min="1"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              disabled={loading}
-            />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              This helps you track how many students have joined vs. expected
-            </p>
-          </div>
-
-          {/* File Upload Area */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
-              Upload PDF Document
-            </label>
-
-            {!uploadedFile ? (
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
-                  isDragOver
-                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500'
-                }`}
-              >
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileSelect}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  disabled={loading}
-                />
-
-                <div className="space-y-4">
-                  <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${
-                    isDragOver ? 'bg-purple-100 dark:bg-purple-800' : 'bg-gray-100 dark:bg-gray-700'
-                  }`}>
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-
-                  <div>
-                    <p className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                      Drop your PDF here
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      or <span className="text-purple-600 dark:text-purple-400 font-medium">browse files</span>
-                    </p>
-                  </div>
-
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    Supports PDF files up to 10MB
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                      <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{uploadedFile.name}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
+          {/* Questions */}
+          {questions.map((question, qIndex) => (
+            <div key={qIndex} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Question {qIndex + 1}
+                </h3>
+                {questions.length > 1 && (
                   <button
                     type="button"
-                    onClick={removeFile}
-                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                    onClick={() => removeQuestion(qIndex)}
+                    className="text-red-500 hover:text-red-700 transition-colors"
                     disabled={loading}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    Remove
                   </button>
-                </div>
+                )}
+              </div>
 
-                <div className="text-center">
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    id="file-replace"
+              <div className="space-y-4">
+                {/* Question text */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Question
+                  </label>
+                  <textarea
+                    value={question.question_text}
+                    onChange={(e) => updateQuestion(qIndex, 'question_text', e.target.value)}
+                    placeholder="Enter your question"
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     disabled={loading}
                   />
-                  <label
-                    htmlFor="file-replace"
-                    className="inline-flex items-center text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 cursor-pointer text-sm font-medium"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    Replace file
+                </div>
+
+                {/* Options */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Options
                   </label>
+                  <div className="space-y-2">
+                    {question.options.map((option, oIndex) => (
+                      <input
+                        key={oIndex}
+                        type="text"
+                        value={option}
+                        onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
+                        placeholder={`Option ${oIndex + 1}`}
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        disabled={loading}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Correct answer */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Correct Answer
+                  </label>
+                  <select
+                    value={question.correct_answer}
+                    onChange={(e) => updateQuestion(qIndex, 'correct_answer', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={loading}
+                  >
+                    <option value="">Select correct answer</option>
+                    {question.options.filter(opt => opt.trim()).map((option, index) => (
+                      <option key={index} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Topic and difficulty */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Topic (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={question.topic}
+                      onChange={(e) => updateQuestion(qIndex, 'topic', e.target.value)}
+                      placeholder="e.g., Cell Biology"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Difficulty
+                    </label>
+                    <select
+                      value={question.difficulty}
+                      onChange={(e) => updateQuestion(qIndex, 'difficulty', e.target.value as 'easy' | 'medium' | 'hard')}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      disabled={loading}
+                    >
+                      <option value="easy">Easy</option>
+                      <option value="medium">Medium</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          ))}
+
+          {/* Add question button */}
+          <button
+            type="button"
+            onClick={addQuestion}
+            className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-4 rounded-xl transition-all flex items-center justify-center"
+            disabled={loading}
+          >
+            <span className="text-2xl mr-2">+</span>
+            Add Another Question
+          </button>
 
           {/* Error message */}
           {error && (
@@ -276,7 +369,7 @@ export default function CreateSessionPage() {
           {/* Submit button */}
           <button
             type="submit"
-            disabled={loading || !uploadedFile}
+            disabled={loading}
             className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700 text-white font-bold py-4 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           >
             {loading ? (
@@ -285,13 +378,14 @@ export default function CreateSessionPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Processing PDF...
+                Creating Session...
               </span>
             ) : (
-              'Create Session from PDF'
+              'Create Session'
             )}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

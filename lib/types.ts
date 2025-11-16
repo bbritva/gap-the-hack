@@ -4,8 +4,6 @@ export interface Teacher {
   id: number;
   email: string;
   name: string;
-  username?: string;
-  password_hash?: string;
   created_at: Date;
 }
 
@@ -15,7 +13,10 @@ export interface Session {
   title: string;
   code: string;
   status: 'active' | 'ended';
-  expected_students?: number;
+  courseContent?: string; // Full PDF text content
+  quizTimeLimit?: number; // Total time for entire quiz in seconds
+  quizStatus?: 'not_started' | 'in_progress' | 'completed';
+  quizStartedAt?: Date; // When teacher started the quiz
   created_at: Date;
   started_at?: Date;
   ended_at?: Date;
