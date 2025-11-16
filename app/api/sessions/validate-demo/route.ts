@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionByCode } from '@/lib/db';
+import { mockStorage } from '@/lib/mock-storage';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const session = await getSessionByCode(code);
+    const session = await mockStorage.getSessionByCode(code);
     
     if (session) {
       return NextResponse.json({

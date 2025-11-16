@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Session Creation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #6366f1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #6366f1;
+            margin-top: 0;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #4f46e5;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            width: 200px;
+            margin: 5px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+        }
+        .error {
+            background: #fee;
+            border-color: #fcc;
+        }
+        .success {
+            background: #efe;
+            border-color: #cfc;
+        }
+        .code-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #6366f1;
+            text-align: center;
+            padding: 20px;
+            background: #f0f9ff;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Session Testing Tool</h1>
+    
+    <!-- Create Session Section -->
+    <div class="container">
+        <h2>1. Create Demo Session</h2>
+        <p>Click to create a session with 3 default quiz questions</p>
+        <input type="text" id="sessionTitle" placeholder="Session Title (optional)" value="My Test Quiz">
+        <button onclick="createSession()">Create Session</button>
+        <div id="createResult"></div>
+    </div>
+
+    <!-- Join Session Section -->
+    <div class="container">
+        <h2>2. Test Student Join</h2>
+        <p>Enter the session code from above to test joining</p>
+        <input type="text" id="studentName" placeholder="Student Name" value="Test Student">
+        <input type="text" id="sessionCode" placeholder="Session Code" maxlength="4">
+        <button onclick="validateCode()">Validate Code</button>
+        <button onclick="joinSession()">Join Session</button>
+        <div id="joinResult"></div>
+    </div>
+
+    <!-- View Questions Section -->
+    <div class="container">
+        <h2>3. View Session Questions</h2>
+        <input type="number" id="sessionId" placeholder="Session ID">
+        <button onclick="viewQuestions()">View Questions</button>
+        <div id="questionsResult"></div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let currentCode = null;
+
+        async function createSession() {
+            const title = document.getElementById('sessionTitle').value;
+            const resultDiv = document.getElementById('createResult');
+            resultDiv.innerHTML = '<p>Creating session...</p>';
+
+            try {
+                const response = await fetch('/api/sessions/create-demo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentSessionId = data.sessionId;
+                    currentCode = data.code;
+                    document.getElementById('sessionCode').value = data.code;
+                    document.getElementById('sessionId').value = data.sessionId;
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ Session Created Successfully!</h3>
+                            <div class="code-display">${data.code}</div>
+                            <p><strong>Session ID:</strong> ${data.sessionId}</p>
+                            <p><strong>Questions:</strong> ${data.questions}</p>
+                            <p><strong>Message:</strong> ${data.message}</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Error</h3>
+                            <p>${data.error}</p>
+                            ${data.details ? `<p><small>${data.details}</small></p>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Network Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function validateCode() {
+            const code = document.getElementById('sessionCode').value;
+            const resultDiv = document.getElementById('joinResult');
+            
+            if (!code) {
+                resultDiv.innerHTML = '<div class="result error">Please enter a session code</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>Validating code...</p>';
+
+            try {
+                const response = await fetch(`/api/sessions/validate-demo?code=${code}`);
+                const data = await response.json();
+
+                if (response.ok && data.valid) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ Valid Code!</h3>
+                            <p><strong>Session:</strong> ${data.session.title}</p>
+                            <p><strong>Status:</strong> ${data.session.status}</p>
+                            <p>Ready to join!</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Invalid Code</h3>
+                            <p>${data.error || 'Session not found'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function joinSession() {
+            const name = document.getElementById('studentName').value;
+            const code = document.getElementById('sessionCode').value;
+            const resultDiv = document.getElementById('joinResult');
+
+            if (!name || !code) {
+                resultDiv.innerHTML = '<div class="result error">Please enter both name and code</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>Joining session...</p>';
+
+            try {
+                const response = await fetch('/api/students/join-demo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, code, interests: [] })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ Successfully Joined!</h3>
+                            <p><strong>Student ID:</strong> ${data.studentId}</p>
+                            <p><strong>Session ID:</strong> ${data.sessionId}</p>
+                            <p><strong>Session:</strong> ${data.session.title}</p>
+                            <p>You can now go to: <a href="/student/session/${data.sessionId}" target="_blank">/student/session/${data.sessionId}</a></p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Failed to Join</h3>
+                            <p>${data.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function viewQuestions() {
+            const sessionId = document.getElementById('sessionId').value;
+            const resultDiv = document.getElementById('questionsResult');
+
+            if (!sessionId) {
+                resultDiv.innerHTML = '<div class="result error">Please enter a session ID</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>Loading questions...</p>';
+
+            try {
+                const response = await fetch(`/api/questions-demo?sessionId=${sessionId}`);
+                const data = await response.json();
+
+                if (response.ok && data.questions) {
+                    let html = '<div class="result success"><h3>📚 Questions</h3>';
+                    data.questions.forEach((q, i) => {
+                        html += `
+                            <div style="margin: 15px 0; padding: 15px; background: #f9f9f9; border-radius: 6px;">
+                                <p><strong>Q${i + 1}:</strong> ${q.question_text}</p>
+                                <p><strong>Topic:</strong> ${q.topic} | <strong>Difficulty:</strong> ${q.difficulty}</p>
+                                <p><strong>Options:</strong></p>
+                                <ul>
+                                    ${q.options.map((opt, idx) => 
+                                        `<li ${idx === q.correct_answer ? 'style="color: green; font-weight: bold;"' : ''}>${opt} ${idx === q.correct_answer ? '✓' : ''}</li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Error</h3>
+                            <p>${data.error || 'Failed to load questions'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
