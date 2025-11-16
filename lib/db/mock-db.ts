@@ -261,6 +261,8 @@ interface SimulationState {
   intervalId: NodeJS.Timeout | null;
   studentIndex: number;
   isRunning: boolean;
+  phase: 'waiting' | 'joining' | 'ready' | 'answering';
+  studentIds: number[];
 }
 
 const simulations: Map<number, SimulationState> = new Map();
@@ -303,36 +305,75 @@ async function simulateStudentAnswer(studentId: number, question: Question) {
   await createResponse(studentId, question.id, answer, isCorrect, timeTaken);
 }
 
-// Add mock student and simulate their answers
-async function addMockStudent(sessionId: number) {
+// Add mock student (without answering yet)
+async function addMockStudent(sessionId: number): Promise<number | null> {
   const session = await getSessionById(sessionId);
   if (!session || session.status !== 'active') {
     stopSimulation(sessionId);
-    return;
+    return null;
   }
 
-  // Check if we've reached expected students
+  // Check if we've reached expected students (default to 21)
   const currentStudents = await getStudentsBySession(sessionId);
-  if (session.expected_students && currentStudents.length >= session.expected_students) {
-    stopSimulation(sessionId);
-    return;
+  const targetStudents = session.expected_students || 21;
+  
+  if (currentStudents.length >= targetStudents) {
+    // All students have joined, move to ready phase
+    const simulation = simulations.get(sessionId);
+    if (simulation && simulation.phase === 'joining') {
+      simulation.phase = 'ready';
+      // Wait 5 seconds then start answering
+      setTimeout(() => {
+        startAnsweringPhase(sessionId);
+      }, 5000);
+    }
+    return null;
   }
 
   // Create mock student
   const studentName = getNextMockStudentName(sessionId);
   const student = await createStudent(sessionId, studentName);
+  
+  // Track student ID
+  const simulation = simulations.get(sessionId);
+  if (simulation) {
+    simulation.studentIds.push(student.id);
+  }
 
+  return student.id;
+}
+
+// Start the answering phase for all students
+async function startAnsweringPhase(sessionId: number) {
+  const simulation = simulations.get(sessionId);
+  if (!simulation || simulation.phase !== 'ready') {
+    return;
+  }
+
+  simulation.phase = 'answering';
+  
   // Get all questions for this session
   const questions = await getQuestionsBySession(sessionId);
-
-  // Simulate answering questions with delays
-  for (let i = 0; i < questions.length; i++) {
-    // Random delay between 2-5 seconds per question
-    const delay = 2000 + Math.floor(Math.random() * 3000);
-    setTimeout(async () => {
-      await simulateStudentAnswer(student.id, questions[i]);
-    }, delay * (i + 1));
+  
+  // All students start answering questions
+  for (const studentId of simulation.studentIds) {
+    // Each student answers questions with progressive delays
+    for (let i = 0; i < questions.length; i++) {
+      // Random delay between 3-8 seconds per question
+      const baseDelay = 3000 + Math.floor(Math.random() * 5000);
+      const delay = baseDelay * (i + 1);
+      
+      setTimeout(async () => {
+        await simulateStudentAnswer(studentId, questions[i]);
+      }, delay);
+    }
   }
+  
+  // Stop simulation after all answers are submitted
+  const maxDelay = questions.length * 10000; // Approximate max time
+  setTimeout(() => {
+    stopSimulation(sessionId);
+  }, maxDelay);
 }
 
 // Start simulation for a session
@@ -346,25 +387,46 @@ export function startSimulation(sessionId: number) {
     intervalId: null,
     studentIndex: 0,
     isRunning: true,
+    phase: 'waiting',
+    studentIds: [],
   };
 
-  // Add 2-3 students every 1-2 seconds
-  simulation.intervalId = setInterval(async () => {
-    if (!simulation.isRunning) {
-      stopSimulation(sessionId);
-      return;
-    }
-
-    // Add 2-3 students
-    const numStudents = 2 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < numStudents; i++) {
-      await addMockStudent(sessionId);
-      // Small delay between each student
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-  }, 1500); // Every 1.5 seconds
-
   simulations.set(sessionId, simulation);
+
+  // Wait 2 seconds before starting to add students
+  setTimeout(() => {
+    const sim = simulations.get(sessionId);
+    if (!sim || !sim.isRunning) return;
+    
+    sim.phase = 'joining';
+    
+    // Add 2-3 students every 1-2 seconds
+    sim.intervalId = setInterval(async () => {
+      if (!sim.isRunning || sim.phase !== 'joining') {
+        if (sim.intervalId) {
+          clearInterval(sim.intervalId);
+          sim.intervalId = null;
+        }
+        return;
+      }
+
+      // Add 2-3 students
+      const numStudents = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < numStudents; i++) {
+        const studentId = await addMockStudent(sessionId);
+        if (studentId === null) {
+          // Reached target, stop adding students
+          if (sim.intervalId) {
+            clearInterval(sim.intervalId);
+            sim.intervalId = null;
+          }
+          return;
+        }
+        // Small delay between each student
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }, 1500); // Every 1.5 seconds
+  }, 2000); // Initial 2-second delay
 }
 
 // Stop simulation for a session
