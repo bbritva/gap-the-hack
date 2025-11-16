@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
-import { initializeDatabase, seedTeachers } from '../lib/db';
+import { initializeDatabase } from '../lib/db';
+import { seedTeachers } from '../lib/db/mock-db';
 
 // Load environment variables from .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
@@ -19,7 +20,7 @@ async function main() {
     console.log('\nYou can now login with:');
     console.log('  Username: teacher1, teacher2, teacher3, teacher4, or teacher5');
     console.log('  Password: 123');
-    
+
     process.exit(0);
   } catch (error) {
     console.error('Error setting up database:', error);

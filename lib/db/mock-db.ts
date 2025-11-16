@@ -409,6 +409,23 @@ export async function seedDemoData() {
   return { teacher, session };
 }
 
+// Seed teachers for authentication
+export async function seedTeachers() {
+  const teachers = [
+    { username: 'teacher1', password: '123', name: 'Teacher One' },
+    { username: 'teacher2', password: '123', name: 'Teacher Two' },
+    { username: 'teacher3', password: '123', name: 'Teacher Three' },
+    { username: 'teacher4', password: '123', name: 'Teacher Four' },
+    { username: 'teacher5', password: '123', name: 'Teacher Five' },
+  ];
+
+  for (const teacher of teachers) {
+    await createTeacher(teacher.username, teacher.name);
+  }
+
+  console.log('Seeded 5 teachers successfully');
+}
+
 // Debug function to check database state
 export function getDbState() {
   return {
