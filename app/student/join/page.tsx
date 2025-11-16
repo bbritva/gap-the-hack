@@ -65,7 +65,7 @@ export default function StudentJoinPage() {
 
         if (joinResponse.ok) {
           localStorage.setItem('student_id', joinData.studentId.toString());
-          router.push(`/student/quiz/${sessionData.sessionId}`);
+          router.push(`/student/session/${sessionData.sessionId}`);
         } else {
           setError('Failed to join session. Please try again.');
         }

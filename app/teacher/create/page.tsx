@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { generateMockQuiz } from '@/lib/mock-quiz-generator';
 
 export default function CreateSessionPage() {
   const router = useRouter();
@@ -81,15 +82,23 @@ export default function CreateSessionPage() {
     setLoading(true);
 
     try {
-      // For now, we'll create a session without questions
-      // In the future, this would process the PDF to generate questions
+      // Generate mock quiz questions from the uploaded PDF
+      if (!uploadedFile) {
+        setError('Please upload a file');
+        setLoading(false);
+        return;
+      }
+      
+      const mockQuestions = generateMockQuiz(uploadedFile.name);
+      
+      // Create session with mock questions
       const sessionResponse = await fetch('/api/sessions/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           expected_students: expectedStudents ? parseInt(expectedStudents) : undefined,
-          questions: [], // Empty for now - PDF processing would generate these
+          questions: mockQuestions,
         }),
       });
 
