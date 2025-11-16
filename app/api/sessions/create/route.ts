@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession, createQuestion } from '@/lib/db/mock-db';
+import { createSession, createQuestion, startSimulation } from '@/lib/db/mock-db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
         q.order_index
       );
     }
+
+    // Auto-start mock student simulation
+    startSimulation(session.id);
 
     return NextResponse.json({
       success: true,

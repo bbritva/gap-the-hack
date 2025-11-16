@@ -241,6 +241,150 @@ export async function getLeaderboard(sessionId: number) {
   return leaderboard.sort((a, b) => b.score - a.score);
 }
 
+// Mock student names for simulation
+const MOCK_STUDENT_NAMES = [
+  'Alex Johnson', 'Emma Smith', 'Michael Brown', 'Sophia Davis', 'James Wilson',
+  'Olivia Martinez', 'William Garcia', 'Ava Rodriguez', 'Benjamin Lee', 'Isabella Walker',
+  'Lucas Hall', 'Mia Allen', 'Henry Young', 'Charlotte King', 'Alexander Wright',
+  'Amelia Lopez', 'Daniel Hill', 'Harper Scott', 'Matthew Green', 'Evelyn Adams',
+  'Jackson Baker', 'Abigail Nelson', 'Sebastian Carter', 'Emily Mitchell', 'David Perez',
+  'Elizabeth Roberts', 'Joseph Turner', 'Sofia Phillips', 'Samuel Campbell', 'Avery Parker',
+  'Owen Evans', 'Ella Edwards', 'Jack Collins', 'Scarlett Stewart', 'Luke Sanchez',
+  'Grace Morris', 'Ryan Rogers', 'Chloe Reed', 'Nathan Cook', 'Zoey Morgan',
+  'Isaac Bell', 'Lily Murphy', 'Gabriel Bailey', 'Hannah Rivera', 'Anthony Cooper',
+  'Aria Richardson', 'Dylan Cox', 'Layla Howard', 'Christopher Ward', 'Nora Torres'
+];
+
+// Simulation state
+interface SimulationState {
+  sessionId: number;
+  intervalId: NodeJS.Timeout | null;
+  studentIndex: number;
+  isRunning: boolean;
+}
+
+const simulations: Map<number, SimulationState> = new Map();
+
+// Generate mock student name
+function getNextMockStudentName(sessionId: number): string {
+  const simulation = simulations.get(sessionId);
+  if (!simulation) return MOCK_STUDENT_NAMES[0];
+  
+  const name = MOCK_STUDENT_NAMES[simulation.studentIndex % MOCK_STUDENT_NAMES.length];
+  simulation.studentIndex++;
+  return name;
+}
+
+// Calculate success rate based on difficulty
+function getSuccessRate(difficulty: 'foundation' | 'application' | 'analysis'): number {
+  switch (difficulty) {
+    case 'foundation':
+      return 0.70 + Math.random() * 0.20; // 70-90%
+    case 'application':
+      return 0.50 + Math.random() * 0.20; // 50-70%
+    case 'analysis':
+      return 0.30 + Math.random() * 0.20; // 30-50%
+    default:
+      return 0.60;
+  }
+}
+
+// Simulate student answering a question
+async function simulateStudentAnswer(studentId: number, question: Question) {
+  const successRate = getSuccessRate(question.difficulty);
+  const isCorrect = Math.random() < successRate;
+  const answer = isCorrect 
+    ? question.options[question.correct_answer]
+    : question.options[Math.floor(Math.random() * question.options.length)];
+  
+  // Random time between 5-15 seconds
+  const timeTaken = 5 + Math.floor(Math.random() * 11);
+  
+  await createResponse(studentId, question.id, answer, isCorrect, timeTaken);
+}
+
+// Add mock student and simulate their answers
+async function addMockStudent(sessionId: number) {
+  const session = await getSessionById(sessionId);
+  if (!session || session.status !== 'active') {
+    stopSimulation(sessionId);
+    return;
+  }
+
+  // Check if we've reached expected students
+  const currentStudents = await getStudentsBySession(sessionId);
+  if (session.expected_students && currentStudents.length >= session.expected_students) {
+    stopSimulation(sessionId);
+    return;
+  }
+
+  // Create mock student
+  const studentName = getNextMockStudentName(sessionId);
+  const student = await createStudent(sessionId, studentName);
+
+  // Get all questions for this session
+  const questions = await getQuestionsBySession(sessionId);
+
+  // Simulate answering questions with delays
+  for (let i = 0; i < questions.length; i++) {
+    // Random delay between 2-5 seconds per question
+    const delay = 2000 + Math.floor(Math.random() * 3000);
+    setTimeout(async () => {
+      await simulateStudentAnswer(student.id, questions[i]);
+    }, delay * (i + 1));
+  }
+}
+
+// Start simulation for a session
+export function startSimulation(sessionId: number) {
+  // Stop existing simulation if any
+  stopSimulation(sessionId);
+
+  // Create new simulation state
+  const simulation: SimulationState = {
+    sessionId,
+    intervalId: null,
+    studentIndex: 0,
+    isRunning: true,
+  };
+
+  // Add 2-3 students every 1-2 seconds
+  simulation.intervalId = setInterval(async () => {
+    if (!simulation.isRunning) {
+      stopSimulation(sessionId);
+      return;
+    }
+
+    // Add 2-3 students
+    const numStudents = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numStudents; i++) {
+      await addMockStudent(sessionId);
+      // Small delay between each student
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }, 1500); // Every 1.5 seconds
+
+  simulations.set(sessionId, simulation);
+}
+
+// Stop simulation for a session
+export function stopSimulation(sessionId: number) {
+  const simulation = simulations.get(sessionId);
+  if (simulation) {
+    simulation.isRunning = false;
+    if (simulation.intervalId) {
+      clearInterval(simulation.intervalId);
+    }
+    simulations.delete(sessionId);
+  }
+}
+
+// Check if simulation is running
+export function isSimulationRunning(sessionId: number): boolean {
+  const simulation = simulations.get(sessionId);
+  return simulation ? simulation.isRunning : false;
+}
+
 // Seed some demo data
 export async function seedDemoData() {
   // Create a demo teacher
