@@ -72,8 +72,9 @@ export default function InterestsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('student_id', data.studentId.toString());
-        router.push(`/student/quiz/${data.sessionId}`);
+        localStorage.setItem('student_id', data.student.id.toString());
+        // Redirect to session waiting page
+        router.push(`/student/session/${data.session.id}`);
       } else {
         alert('Failed to join session. Please try again.');
         router.push('/student/join');
@@ -105,8 +106,9 @@ export default function InterestsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('student_id', data.studentId.toString());
-        router.push(`/student/quiz/${data.sessionId}`);
+        localStorage.setItem('student_id', data.student.id.toString());
+        // Redirect to session waiting page
+        router.push(`/student/session/${data.session.id}`);
       } else {
         alert('Failed to join session. Please try again.');
         router.push('/student/join');

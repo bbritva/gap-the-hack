@@ -64,8 +64,9 @@ export default function StudentJoinPage() {
         const joinData = await joinResponse.json();
 
         if (joinResponse.ok) {
-          localStorage.setItem('student_id', joinData.studentId.toString());
-          router.push(`/student/quiz/${sessionData.sessionId}`);
+          localStorage.setItem('student_id', joinData.student.id.toString());
+          // Redirect to session waiting page instead of quiz
+          router.push(`/student/session/${sessionData.sessionId}`);
         } else {
           setError('Failed to join session. Please try again.');
         }
