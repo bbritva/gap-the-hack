@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createResponse } from '@/lib/db/mock-db';
+import { createResponse } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentId, questionId, answer, isCorrect, timeTaken } = body;
+    const { studentId, questionId, sessionId, answer, isCorrect, timeTaken, pointsEarned } = body;
 
-    if (!studentId || !questionId || answer === undefined || isCorrect === undefined) {
+    if (!studentId || !questionId || !sessionId || answer === undefined || isCorrect === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -16,9 +16,11 @@ export async function POST(request: NextRequest) {
     const response = await createResponse(
       studentId,
       questionId,
+      sessionId,
       answer,
       isCorrect,
-      timeTaken
+      timeTaken,
+      pointsEarned
     );
 
     return NextResponse.json({

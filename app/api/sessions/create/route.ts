@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession, createQuestion } from '@/lib/db/mock-db';
+import { createSession, createQuestion, generateSessionCode } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,19 +13,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique code
+    const code = await generateSessionCode();
+
     // Create session (using demo teacher ID for MVP)
-    const session = await createSession(1, title, expected_students);
+    const session = await createSession(1, title, code);
 
     // Create questions
-    for (const q of questions) {
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
       await createQuestion(
         session.id,
         q.question_text,
         q.options,
         q.correct_answer,
-        q.topic,
-        q.difficulty,
-        q.order_index
+        q.topic || 'General',
+        q.difficulty || 'application',
+        q.points || 100,
+        i
       );
     }
 

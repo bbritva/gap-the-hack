@@ -73,7 +73,7 @@ export default function InterestsPage() {
 
       if (response.ok) {
         localStorage.setItem('student_id', data.studentId.toString());
-        router.push(`/student/quiz/${data.sessionId}`);
+        router.push(`/student/session/${data.sessionId}`);
       } else {
         alert('Failed to join session. Please try again.');
         router.push('/student/join');
@@ -106,7 +106,7 @@ export default function InterestsPage() {
 
       if (response.ok) {
         localStorage.setItem('student_id', data.studentId.toString());
-        router.push(`/student/quiz/${data.sessionId}`);
+        router.push(`/student/session/${data.sessionId}`);
       } else {
         alert('Failed to join session. Please try again.');
         router.push('/student/join');

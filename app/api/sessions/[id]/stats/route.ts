@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionStats } from '@/lib/db/mock-db';
+import { getSessionStats } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,

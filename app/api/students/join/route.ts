@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
     const student = await createStudent(session.id, name, interests);
 
     return NextResponse.json({
+      studentId: student.id,
+      sessionId: session.id,
       student,
       session: {
         id: session.id,

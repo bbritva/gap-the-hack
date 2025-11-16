@@ -375,11 +375,90 @@ export async function isCodeUnique(code: string): Promise<boolean> {
 export async function generateSessionCode(): Promise<string> {
   let code: string;
   let isUnique = false;
-  
+
   do {
     code = generateUniqueCode();
     isUnique = await isCodeUnique(code);
   } while (!isUnique);
-  
+
   return code;
+}
+
+// Analytics functions
+export async function getSessionStats(sessionId: number) {
+  try {
+    const students = await getStudentsBySession(sessionId);
+    const questions = await getQuestionsBySession(sessionId);
+    const responses = await getResponsesBySession(sessionId);
+
+    const totalStudents = students.length;
+    const correctResponses = responses.filter(r => r.is_correct).length;
+    const averageScore = responses.length > 0
+      ? (correctResponses / responses.length) * 100
+      : 0;
+
+    const questionStats = questions.map(q => {
+      const questionResponses = responses.filter(r => r.question_id === q.id);
+      const correctCount = questionResponses.filter(r => r.is_correct).length;
+      const totalTime = questionResponses.reduce((sum, r) => sum + (r.time_taken || 0), 0);
+
+      return {
+        questionId: q.id,
+        questionText: q.question_text,
+        topic: q.topic,
+        correctPercentage: questionResponses.length > 0
+          ? (correctCount / questionResponses.length) * 100
+          : 0,
+        averageTime: questionResponses.length > 0
+          ? totalTime / questionResponses.length
+          : 0,
+        totalResponses: questionResponses.length,
+      };
+    });
+
+    return {
+      totalStudents,
+      activeStudents: totalStudents,
+      averageScore,
+      questionStats,
+    };
+  } catch (error) {
+    console.error('Error getting session stats:', error);
+    throw error;
+  }
+}
+
+export async function getLeaderboard(sessionId: number) {
+  try {
+    const students = await getStudentsBySession(sessionId);
+    const questions = await getQuestionsBySession(sessionId);
+
+    const leaderboard = await Promise.all(
+      students.map(async (student) => {
+        const studentResponses = await getResponsesByStudent(student.id);
+        const correctAnswers = studentResponses.filter(r => r.is_correct).length;
+        const totalTime = studentResponses.reduce((sum, r) => sum + (r.time_taken || 0), 0);
+
+        // Calculate score: correct answers * 100 + speed bonus
+        const baseScore = correctAnswers * 100;
+        const speedBonus = studentResponses.length > 0
+          ? Math.max(0, 500 - totalTime / studentResponses.length)
+          : 0;
+        const score = Math.round(baseScore + speedBonus);
+
+        return {
+          studentId: student.id,
+          name: student.name,
+          score,
+          correctAnswers,
+          totalQuestions: questions.length,
+        };
+      })
+    );
+
+    return leaderboard.sort((a, b) => b.score - a.score);
+  } catch (error) {
+    console.error('Error getting leaderboard:', error);
+    throw error;
+  }
 }
