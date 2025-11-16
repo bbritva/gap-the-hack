@@ -8,7 +8,7 @@ const DEFAULT_QUESTIONS = [
     options: ["London", "Berlin", "Paris", "Madrid"],
     correct_answer: 2,
     topic: "Geography",
-    difficulty: "knowledge",
+    difficulty: "foundation" as const,
     points: 100
   },
   {
@@ -16,7 +16,7 @@ const DEFAULT_QUESTIONS = [
     options: ["Venus", "Mars", "Jupiter", "Saturn"],
     correct_answer: 1,
     topic: "Science",
-    difficulty: "knowledge",
+    difficulty: "foundation" as const,
     points: 100
   },
   {
@@ -24,7 +24,7 @@ const DEFAULT_QUESTIONS = [
     options: ["40", "41", "42", "43"],
     correct_answer: 2,
     topic: "Math",
-    difficulty: "application",
+    difficulty: "application" as const,
     points: 100
   }
 ];

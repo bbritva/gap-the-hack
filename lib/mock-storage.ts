@@ -96,7 +96,7 @@ export const mockStorage = {
     options: string[],
     correctAnswer: number,
     topic: string,
-    difficulty: string,
+    difficulty: 'foundation' | 'application' | 'analysis',
     points: number,
     orderIndex: number
   ): Promise<Question> {
@@ -135,8 +135,7 @@ export const mockStorage = {
       session_id: sessionId,
       name,
       interests,
-      score: 0,
-      created_at: new Date()
+      joined_at: new Date()
     };
     storage.students.set(id, student);
     return student;
@@ -157,7 +156,7 @@ export const mockStorage = {
     studentId: number,
     questionId: number,
     sessionId: number,
-    answer: number,
+    answer: string,
     isCorrect: boolean,
     timeTaken?: number,
     pointsEarned?: number
@@ -167,11 +166,9 @@ export const mockStorage = {
       id,
       student_id: studentId,
       question_id: questionId,
-      session_id: sessionId,
       answer,
       is_correct: isCorrect,
       time_taken: timeTaken,
-      points_earned: pointsEarned,
       created_at: new Date()
     };
     storage.responses.set(id, response);
@@ -179,9 +176,14 @@ export const mockStorage = {
   },
 
   async getResponsesBySession(sessionId: number): Promise<Response[]> {
+    // Get all students in this session
+    const students = await this.getStudentsBySession(sessionId);
+    const studentIds = new Set(students.map(s => s.id));
+    
+    // Get responses from those students
     const responses: Response[] = [];
     for (const response of storage.responses.values()) {
-      if (response.session_id === sessionId) {
+      if (studentIds.has(response.student_id)) {
         responses.push(response);
       }
     }
