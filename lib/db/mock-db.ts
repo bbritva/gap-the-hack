@@ -302,7 +302,12 @@ async function simulateStudentAnswer(studentId: number, question: Question) {
   await createResponse(studentId, question.id, answer, isCorrect, timeTaken);
 }
 
-// Start simulation for a session - REALISTIC STAGGERED JOINING
+// Helper function to create a delay promise
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Start simulation for a session - REALISTIC STAGGERED JOINING WITH PROPER ASYNC
 export async function startSimulation(sessionId: number) {
   // Stop existing simulation if any
   stopSimulation(sessionId);
@@ -331,67 +336,80 @@ export async function startSimulation(sessionId: number) {
   const targetStudents = 21;
   console.log(`Starting simulation for session ${sessionId}: Students will join in groups...`);
   
-  // STEP 1: Students join in groups of 2-3 every 1-2 seconds
-  let studentsAdded = 0;
-  let currentDelay = 0;
-  
-  while (studentsAdded < targetStudents) {
-    // Group size: 2-3 students
-    const groupSize = Math.min(2 + Math.floor(Math.random() * 2), targetStudents - studentsAdded);
-    
-    // Schedule this group to join
-    setTimeout(async () => {
-      if (!simulation.isRunning) return;
+  // Run the simulation asynchronously without blocking
+  (async () => {
+    try {
+      // STEP 1: Students join in groups of 2-3 every 1-2 seconds
+      let studentsAdded = 0;
       
-      // Add students in this group
-      for (let i = 0; i < groupSize; i++) {
-        const studentIndex = simulation.studentIds.length;
-        const studentName = MOCK_STUDENT_NAMES[studentIndex % MOCK_STUDENT_NAMES.length];
-        const student = await createStudent(sessionId, studentName);
-        simulation.studentIds.push(student.id);
+      while (studentsAdded < targetStudents && simulation.isRunning) {
+        // Group size: 2-3 students
+        const groupSize = Math.min(2 + Math.floor(Math.random() * 2), targetStudents - studentsAdded);
         
-        console.log(`Student ${studentIndex + 1}/${targetStudents} joined: ${studentName}`);
-        
-        // Each student starts answering questions after joining
-        // Small delay (1-3 seconds) before they start answering
-        const startAnsweringDelay = 1000 + Math.random() * 2000;
-        
-        setTimeout(async () => {
-          if (!simulation.isRunning) return;
+        // Add students in this group
+        for (let i = 0; i < groupSize; i++) {
+          if (!simulation.isRunning) break;
           
-          // Answer all 8 questions sequentially
-          for (let questionIndex = 0; questionIndex < questions.length; questionIndex++) {
-            const question = questions[questionIndex];
-            
-            // Time between questions: 5-15 seconds
-            const questionDelay = questionIndex * (5000 + Math.random() * 10000);
-            
-            setTimeout(async () => {
-              if (simulation.isRunning) {
-                await simulateStudentAnswer(student.id, question);
-                console.log(`Student ${studentName} answered question ${questionIndex + 1}/${questions.length}`);
-              }
-            }, questionDelay);
-          }
-        }, startAnsweringDelay);
+          const studentIndex = simulation.studentIds.length;
+          const studentName = MOCK_STUDENT_NAMES[studentIndex % MOCK_STUDENT_NAMES.length];
+          const student = await createStudent(sessionId, studentName);
+          simulation.studentIds.push(student.id);
+          
+          console.log(`Student ${studentIndex + 1}/${targetStudents} joined: ${studentName}`);
+          
+          // Each student starts answering questions after joining (async, non-blocking)
+          simulateStudentAnswers(student.id, studentName, questions, simulation);
+        }
+        
+        studentsAdded += groupSize;
+        
+        // Wait 1-2 seconds before next group joins
+        if (studentsAdded < targetStudents) {
+          await delay(1000 + Math.random() * 1000);
+        }
       }
-    }, currentDelay);
-    
-    studentsAdded += groupSize;
-    
-    // Next group joins after 1-2 seconds
-    currentDelay += 1000 + Math.random() * 1000;
-  }
+      
+      console.log(`All ${simulation.studentIds.length} students have joined session ${sessionId}`);
+      
+      // STEP 2: Wait for all students to finish answering
+      // Max answering time: 3s start delay + (8 questions * 15s max) = ~123 seconds
+      await delay(3000 + (questions.length * 15000) + 10000); // +10s buffer
+      
+      console.log(`Simulation completed for session ${sessionId}. Total students: ${simulation.studentIds.length}`);
+      stopSimulation(sessionId);
+    } catch (error) {
+      console.error(`Error in simulation for session ${sessionId}:`, error);
+      stopSimulation(sessionId);
+    }
+  })();
+}
 
-  // STEP 2: Stop simulation after all students have had time to answer all questions
-  // Max time = joining time + answering time + buffer
-  // Joining: ~21 students / 2.5 avg per group * 1.5s avg = ~12.6 seconds
-  // Answering: 3s start delay + (8 questions * 15s max) = ~123 seconds
-  const maxSimulationTime = currentDelay + 3000 + (questions.length * 15000) + 10000; // +10s buffer
-  setTimeout(() => {
-    console.log(`Simulation completed for session ${sessionId}. Total students: ${simulation.studentIds.length}`);
-    stopSimulation(sessionId);
-  }, maxSimulationTime);
+// Simulate a student answering all questions (async, non-blocking)
+async function simulateStudentAnswers(
+  studentId: number, 
+  studentName: string, 
+  questions: Question[], 
+  simulation: SimulationState
+) {
+  // Small delay (1-3 seconds) before student starts answering
+  await delay(1000 + Math.random() * 2000);
+  
+  if (!simulation.isRunning) return;
+  
+  // Answer all questions sequentially
+  for (let questionIndex = 0; questionIndex < questions.length; questionIndex++) {
+    if (!simulation.isRunning) break;
+    
+    const question = questions[questionIndex];
+    
+    // Time to answer this question: 5-15 seconds
+    await delay(5000 + Math.random() * 10000);
+    
+    if (simulation.isRunning) {
+      await simulateStudentAnswer(studentId, question);
+      console.log(`Student ${studentName} answered question ${questionIndex + 1}/${questions.length}`);
+    }
+  }
 }
 
 // Stop simulation for a session
